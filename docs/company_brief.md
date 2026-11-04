@@ -200,13 +200,7 @@ Acute problems (QuickBooks bug, app crash, processor migration) are fixed within
 - **CSAT bias:** only about 20% of customers answer the survey, and unhappy customers answer more often, so CSAT is a signal, not a precise measure.
 - **AI classification:** labels come from a random sample of 3,000 to 5,000 tickets, scored against an answer key; error rates are reported.
 
-## 12. Keeping clear of MentorCruise
-
-- Different business: an invoicing tool for businesses, not a marketplace matching people.
-- No MentorCruise data, code, ticket text, category names, volumes, response times or processes are used.
-- Every number in this brief is invented for Fernledger.
-
-## 13. Glossary
+## 12. Glossary
 
 | Term | Meaning |
 |---|---|
