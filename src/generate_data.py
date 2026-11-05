@@ -25,7 +25,6 @@ country =rgn.choice(['US', 'UK', 'CA'], size=n_customers, p=[0.60,0.25,0.15])
 #The brief says the CUSTOMER BASE grows about 2.5% a month:
 #about 6,500 customers in Apr 2025 -> about 10,000 by Sep 2026.
 
-#But this code controls something different: how many NEW SIGNUPS happen each month. 
 #The customer base is all signups added up since 2019, so the two growth rates are not the same number.
 
 #To find the right signup growth rate, I tested several values and counted how many customers existed by Apr 2025:
