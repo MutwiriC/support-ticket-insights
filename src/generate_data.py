@@ -101,7 +101,7 @@ from faker import Faker
 Faker.seed(42) #same name evry run
 fake = Faker()
 #generate the names
-business_name = [fake.company() for _ in range(n_customers)]
+business_name = [fake.unique.company() for _ in range(n_customers)]
 
 #compile the array to dataframe
 customers = pd.DataFrame({
@@ -121,3 +121,4 @@ customers.to_csv("data/raw/customers.csv", index=False) # index=False stops pand
 print(customers.shape)
 print(customers.head(2))
 print(customers.isna().sum())
+print(customers["business_name"].duplicated().sum(), "duplicate business names")
