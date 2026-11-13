@@ -197,3 +197,88 @@ print("\n Quietest days \n", daily.nsmallest(5, "tickets"))
 #   the holiday weekends (27-28 Dec, expected about 25) are NOT
 #   in the bottom five, even though their expected value is the lowest.
 #   Why: random variation. A few normal weekends drew unusually low numbers.
+
+"""
+Layer 3:  TICKET DETAILS AND EVENTS
+Create one row per ticket (about 50,000 rows) and give each ticket its details
+"""
+
+# PART A: ONE ROW PER TICKET
+# A1: Expand the daily counts: A day with 95 tickets becoems 95 rows
+# A2: Assign each ticket a time of day(Assuming 13:00-17:00 UTC is the busiest; 
+#     both UK and US customers are working)
+# Give each ticket a customer who had alreadt signed up by that day
+
+#  A1. Repeat each day's date and active-customer count by its number of tickets
+ticket_date = np.repeat(daily["date"], daily["tickets"]).to_numpy()
+active_for_ticket = np.repeat(daily["active_customers"], daily["tickets"]).to_numpy()
+# number of tickets
+n_tickets = len(ticket_date)
+#ticket id starting from 500001
+ticket_id = np.arange(500_001,500_001 + n_tickets)
+
+#check
+print(n_tickets)
+print(len(ticket_date), len(active_for_ticket))
+print(ticket_date[:5])
+print(active_for_ticket[:5])
+
+# A2. TIME OF DAY FOR EACH TICKET
+# Tickets don't arrive evenly over 24 hours: customers contact support
+# while they are working. All times are stored in UTC (world standard time).
+#
+# Who is awake and working at each UTC hour (approximate, ignoring
+# daylight saving; winter offsets: UK = UTC, US Eastern = UTC-5,
+# US Pacific = UTC-8):
+#
+# | UTC hours | UK local    | US Eastern  | US Pacific  | Who is working              | Level | Weight |
+# |-----------|-------------|-------------|-------------|-----------------------------|-------|--------|
+# | 00 - 06   | 00:00-06:00 | 19:00-01:00 | 16:00-22:00 | Almost nobody (US West ends)| low   |   1   |
+# | 07 - 12   | 07:00-12:00 | 02:00-07:00 | 23:00-04:00 | UK only                     | mid   |   5   |
+# | 13 - 17   | 13:00-17:00 | 08:00-12:00 | 05:00-09:00 | UK + US East                | high  |   10    |
+# | 18 - 21   | 18:00-21:00 | 13:00-16:00 | 10:00-13:00 | US East + US West           | high  |   10    |
+# | 22 - 23   | 22:00-23:00 | 17:00-18:00 | 14:00-15:00 | US West (+ US East ending)  | low   |   1   |
+#
+# Assumptions:
+#   - Customer split from the brief: US 60%, UK 25%, Canada 15%.
+#     Canada shares US time zones, so 75% of customers are North American.
+#     That's why 18:00-21:00 UTC (US afternoon) stays HIGH even though
+#     the UK has finished work: the biggest group is still working.
+#   - Night hours are LOW, not zero: some freelancers work late or
+#     send invoices in the evening.
+#   - Daylight saving shifts real times by 1 hour for part of the year;
+#     ignored here for simplicity (noted as a limitation).
+#   - The weight numbers only matter relative to each other:
+#     a weight of 10 means 10x as many tickets as a weight of 1.
+
+hour_weights = np.array(
+    [1]* 7 +  # 00-06: low (7 hours)
+    [5] * 6 + # 07-12: mid (6 hours)
+    [10] * 5 + # 13-17: high (5 hours)
+    [10] * 4 + # 18-21: high (4 hours)
+    [1] * 2 # 22-23: low (2 hours)
+    )
+
+#weights  as a probability
+p_hour = hour_weights/hour_weights.sum()
+
+#one hour per ticket, picked with the probability above
+hours = rng.choice(24, size = n_tickets, p=p_hour)
+
+#a random minute and second for each ticket
+minutes = rng.integers(0,60, size = n_tickets)
+seconds = rng.integers(0,60, size = n_tickets)
+
+#check
+print(len(hour_weights), p_hour.sum())
+print(np.bincount(hours)) #check the shape of the ticket
+
+#combine date +hour + minute + seconds into one full timestamp per ticket 
+# using pd.to_timedelta(array, unit)
+# where unit can be "h", "m" or "s"
+created_at = (pd.to_datetime(ticket_date) #convert ticket_date to datetime
++ pd.to_timedelta(hours, unit='h') #add hours
++ pd.to_timedelta(minutes, unit='m') #add minutes
++ pd.to_timedelta(seconds, unit='s')).sort_values()#add seconds
+# Sorted so tickets are in time order (ticket ids then increase over time, like a real helpdesk).
+print(created_at[:5])
