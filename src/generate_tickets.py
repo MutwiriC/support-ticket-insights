@@ -44,22 +44,23 @@ STEPS IN THIS FILE
 # STEP A: ACTIVE CUSTOMERS ON EACH DAY
 # A customer can only raise a ticket after they sign up.
 # So for every day we need: how many customers existed by then?
-# Plan: (1) count signups per day, 
+# Plan: (1) count signups per day,
 #       (2) fill in days with no signups,
 #       (3) running total -> customers so far.
 
 import pandas as pd
 import numpy as np
+
 rng = np.random.default_rng(42)
 
 
-customers = pd.read_csv("data/raw/customers.csv") #Load customers
-signup = pd.to_datetime(customers["signup_date"]) #convert date to correct format
+customers = pd.read_csv("data/raw/customers.csv")  # Load customers
+signup = pd.to_datetime(customers["signup_date"])  # convert date to correct format
 
-#count customers signup each day and sort by date
+# count customers signup each day and sort by date
 signup_per_day = signup.value_counts().sort_index()
-#view signups
-#print(signup_per_day.head())
+# view signups
+# print(signup_per_day.head())
 
 # Step A2: fill in the missing days, with reindex
 # Make a full calendar: every single day from first signup (2019-06-01)
@@ -72,13 +73,13 @@ signup_full = signup_per_day.reindex(all_days, fill_value=0)
 
 # Step A3: use cumsum() to calculate the running total
 active_all = signup_full.cumsum()
-#print(active_all)
+# print(active_all)
 
 # Step A4: Keep the analysis window
-#Customers who signup before April 2025 are still counted
+# Customers who signup before April 2025 are still counted
 days = pd.date_range("2025-04-01", "2026-09-30")
 
-#slice from April 1st 2025 to last date
+# slice from April 1st 2025 to last date
 active = active_all.loc["2025-04-01":]
 
 # Check for 548 days, 6,370 customers on day 1, and around 10,000 on last day
@@ -98,35 +99,42 @@ print(active.iloc[-1], "Active customer on 30 Sep 2026")
 #          (about 60% busier than a normal day)
 
 # B1. Weekday multiplier: a dictionary from day number (Mon=0 ... Sun=6)
-weekday_multiplier = {0:1.25, 1:1.05, 2:1.05, 3:1.05, 4:1.00, 5:0.40, 6:0.40}
+weekday_multiplier = {0: 1.25, 1: 1.05, 2: 1.05, 3: 1.05, 4: 1.00, 5: 0.40, 6: 0.40}
 # lookup each day's value with .map
 weekday_mult = pd.Series(days.day_of_week).map(weekday_multiplier).to_numpy()
 
-#B2: Month-end multiplier: last 3 days + first 2 days of a month x1.3
-#first 2 days: days.day <=2
+# B2: Month-end multiplier: last 3 days + first 2 days of a month x1.3
+# first 2 days: days.day <=2
 # last 3 days: days.days_in_month - days.day < 3
-month_end_mult = np.where((days.day <=2) | (days.days_in_month - days.day < 3), 1.3, 1.0)
+month_end_mult = np.where(
+    (days.day <= 2) | (days.days_in_month - days.day < 3), 1.3, 1.0
+)
 
-#B3 Holiday multiplier: 22 Dec to 2 Jan x0.65
+# B3 Holiday multiplier: 22 Dec to 2 Jan x0.65
 # 22- 31 Dec: days.month==12 & days.day >= 22
 # 1-2 Jan: days.month ==1 & days.day <=2
 
-holiday_mult = np.where (((days.month==12) & (days.day >= 22)) | 
-                         ((days.month ==1) & (days.day <=2)), 0.65, 1.0)
+holiday_mult = np.where(
+    ((days.month == 12) & (days.day >= 22)) | ((days.month == 1) & (days.day <= 2)),
+    0.65,
+    1.0,
+)
 
 multiplier = weekday_mult * month_end_mult * holiday_mult
 
-#verify the dates
-check = pd.DataFrame({
-    "date": days,
-    "weekday": days.day_name(),
-    "weekday_mult": weekday_mult,
-    "month_end_mult": month_end_mult,
-    "holiday_mult": holiday_mult,
-    "multiplier": multiplier
-})
+# verify the dates
+check = pd.DataFrame(
+    {
+        "date": days,
+        "weekday": days.day_name(),
+        "weekday_mult": weekday_mult,
+        "month_end_mult": month_end_mult,
+        "holiday_mult": holiday_mult,
+        "multiplier": multiplier,
+    }
+)
 
-print(check[(check["date"]>= "2025-12-22") & (check["date"] <= "2026-01-04")])
+print(check[(check["date"] >= "2025-12-22") & (check["date"] <= "2026-01-04")])
 
 # STEP C: EXPECTED AND ACTUAL TICKETS PER DAY
 # C1. Expected tickets = active customers x contact rate x multiplier
@@ -139,42 +147,56 @@ print(check[(check["date"]>= "2025-12-22") & (check["date"] <= "2026-01-04")])
 #     (expected 100 -> most days between about 80 and 120).
 
 # Contact rate = each customer's chance of raising a ticket on a given day.
-target_total_tickets = 50_000 #from brief
-event_tickets_estimate = 1_000 #my estimate of extra tickets for events such as updates/bugs
+target_total_tickets = 50_000  # from brief
+event_tickets_estimate = (
+    1_000  # my estimate of extra tickets for events such as updates/bugs
+)
 target_everyday_tickets = target_total_tickets - event_tickets_estimate
 
-#each day contributes to the total tickets: active customers x Multipliers
+# each day contributes to the total tickets: active customers x Multipliers
 weighted_customer_days = (active.to_numpy() * multiplier).sum()
 
 # total tickets = contact rate x weighted_customer_days
-contact_rate = target_everyday_tickets /weighted_customer_days
+contact_rate = target_everyday_tickets / weighted_customer_days
 
 print(round(weighted_customer_days), "weighted_customer_days")
 print(round(contact_rate, 4), "contact rate")
-print(round(1/contact_rate), "average days between tickets per customer")
+print(round(1 / contact_rate), "average days between tickets per customer")
 
 # C1: expected tickets per day
 # active customer x contact rate x multiplier
-expected = active.to_numpy()*contact_rate*multiplier
+expected = active.to_numpy() * contact_rate * multiplier
 
 # C2: Actual tickets per day using poisson to draw around each expected value
 tickets = rng.poisson(expected)
 
 # C3: combine to one daily table to confirm
-daily = pd.DataFrame({
-    "date": days,
-    "active_customers": active.to_numpy(),
-    "multiplier": multiplier,
-    "expected": expected,
-    "tickets": tickets
-})
+daily = pd.DataFrame(
+    {
+        "date": days,
+        "active_customers": active.to_numpy(),
+        "multiplier": multiplier,
+        "expected": expected,
+        "tickets": tickets,
+    }
+)
 
-#confirm
+# confirm
 print(daily.head(10))
 print(daily["tickets"].sum(), "tickets in total")
 
-day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-average_tickets_weekday = daily.groupby(daily["date"].dt.day_name())["tickets"].mean().reindex(day_order)
+day_order = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+average_tickets_weekday = (
+    daily.groupby(daily["date"].dt.day_name())["tickets"].mean().reindex(day_order)
+)
 print("Average ticket distribution per week \n ", average_tickets_weekday)
 
 # Total tickets distribution per month per year
@@ -204,20 +226,20 @@ Create one row per ticket (about 50,000 rows) and give each ticket its details
 """
 
 # PART A: ONE ROW PER TICKET
-# A1: Expand the daily counts: A day with 95 tickets becoems 95 rows
-# A2: Assign each ticket a time of day(Assuming 13:00-17:00 UTC is the busiest; 
+# A1: Expand the daily counts: A day with 95 tickets becomes 95 rows
+# A2: Assign each ticket a time of day(Assuming 13:00-17:00 UTC is the busiest;
 #     both UK and US customers are working)
-# Give each ticket a customer who had alreadt signed up by that day
+# Give each ticket a customer who had already signed up by that day
 
 #  A1. Repeat each day's date and active-customer count by its number of tickets
 ticket_date = np.repeat(daily["date"], daily["tickets"]).to_numpy()
 active_for_ticket = np.repeat(daily["active_customers"], daily["tickets"]).to_numpy()
 # number of tickets
 n_tickets = len(ticket_date)
-#ticket id starting from 500001
-ticket_id = np.arange(500_001,500_001 + n_tickets)
+# ticket id starting from 500001
+ticket_id = np.arange(500_001, 500_001 + n_tickets)
 
-#check
+# check
 print(n_tickets)
 print(len(ticket_date), len(active_for_ticket))
 print(ticket_date[:5])
@@ -252,33 +274,57 @@ print(active_for_ticket[:5])
 #     a weight of 10 means 10x as many tickets as a weight of 1.
 
 hour_weights = np.array(
-    [1]* 7 +  # 00-06: low (7 hours)
-    [5] * 6 + # 07-12: mid (6 hours)
-    [10] * 5 + # 13-17: high (5 hours)
-    [10] * 4 + # 18-21: high (4 hours)
-    [1] * 2 # 22-23: low (2 hours)
-    )
+    [1] * 7  # 00-06: low (7 hours)
+    + [5] * 6  # 07-12: mid (6 hours)
+    + [10] * 5  # 13-17: high (5 hours)
+    + [10] * 4  # 18-21: high (4 hours)
+    + [1] * 2  # 22-23: low (2 hours)
+)
 
-#weights  as a probability
-p_hour = hour_weights/hour_weights.sum()
+# weights  as a probability
+p_hour = hour_weights / hour_weights.sum()
 
-#one hour per ticket, picked with the probability above
-hours = rng.choice(24, size = n_tickets, p=p_hour)
+# one hour per ticket, picked with the probability above
+hours = rng.choice(24, size=n_tickets, p=p_hour)
 
-#a random minute and second for each ticket
-minutes = rng.integers(0,60, size = n_tickets)
-seconds = rng.integers(0,60, size = n_tickets)
+# a random minute and second for each ticket
+minutes = rng.integers(0, 60, size=n_tickets)
+seconds = rng.integers(0, 60, size=n_tickets)
 
-#check
+# check
 print(len(hour_weights), p_hour.sum())
-print(np.bincount(hours)) #check the shape of the ticket
+print(np.bincount(hours))  # check the shape of the ticket
 
-#combine date +hour + minute + seconds into one full timestamp per ticket 
+# combine date +hour + minute + seconds into one full timestamp per ticket
 # using pd.to_timedelta(array, unit)
 # where unit can be "h", "m" or "s"
-created_at = (pd.to_datetime(ticket_date) #convert ticket_date to datetime
-+ pd.to_timedelta(hours, unit='h') #add hours
-+ pd.to_timedelta(minutes, unit='m') #add minutes
-+ pd.to_timedelta(seconds, unit='s')).sort_values()#add seconds
+created_at = (
+    pd.to_datetime(ticket_date)  # convert ticket_date to datetime
+    + pd.to_timedelta(hours, unit="h")  # add hours
+    + pd.to_timedelta(minutes, unit="m")  # add minutes
+    + pd.to_timedelta(seconds, unit="s")
+).sort_values()  # add seconds
 # Sorted so tickets are in time order (ticket ids then increase over time, like a real helpdesk).
+# dates were already in order, so tickets only move
+# within their own day, and active_for_ticket is the same for every ticket on a day.
 print(created_at[:5])
+
+# A3: Customers for each ticket
+# sort customers by signup date and then renumber rows starting from 0
+# therefore, 0= earliest signup, N-1 = the Nth customer to sign up
+customers_sorted = customers.sort_values("signup_date").reset_index(drop=True)
+
+# Add one random position per ticket, from 0 up to N-1
+position = rng.integers(0, active_for_ticket)
+
+# lookup customer_id for each postion
+customer_id = customers_sorted["customer_id"].to_numpy()[position]
+
+# check
+print ("A3 Check")
+print(position[:5], active_for_ticket[:5])
+print(customer_id[:5])
+print(len(position), n_tickets)
+print((position < active_for_ticket).all()) 
+
+# Join A1 to A3
