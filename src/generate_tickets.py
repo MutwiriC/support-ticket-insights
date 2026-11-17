@@ -328,3 +328,17 @@ print(len(position), n_tickets)
 print((position < active_for_ticket).all()) 
 
 # Join A1 to A3
+tickets_df = pd.DataFrame({
+    "ticket_id": ticket_id,
+    "customer_id": customer_id,
+    "created_at": created_at
+})
+
+joined = tickets_df.merge(customers[["customer_id", "signup_date"]], on= "customer_id")
+
+before_signup = joined["created_at"] < pd.to_datetime(joined["signup_date"])
+print(before_signup.sum(), "tickets before signup")
+
+#confirm
+print(tickets_df.shape)
+print(tickets_df.head())
