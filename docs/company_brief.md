@@ -62,7 +62,7 @@ Payment processing runs through a third-party payment processor behind the scene
 | Team size | 22 agents: 14 Tier 1 (general), 6 Tier 2 (payments and billing specialists), 2 team leads. Tier 3 = engineering escalations |
 | AI assistant | **"Fern Assist"**, launched 4 Aug 2025 on chat and the web form (see events) |
 | Help centre | About 180 articles |
-| Helpdesk tool | Exports tickets as CSV (this is the data we analyse) |
+| Helpdesk tool | Not specified |
 
 **First-response targets by plan (SLA):**
 
