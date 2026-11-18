@@ -342,3 +342,77 @@ print(before_signup.sum(), "tickets before signup")
 #confirm
 print(tickets_df.shape)
 print(tickets_df.head())
+
+
+# PART B: TRUE CATEGORY OF EACH TICKET
+# Each ticket gets the category it is really in.
+# The category depends on the customer's plan (see table below).
+
+# B1. Give each ticket its customer's plan
+# set_index makes customer_id the row label, so .map() can look up plans by id
+plan_lookup = customers.set_index("customer_id")["plan"]
+tickets_df["plan"] = tickets_df["customer_id"].map(plan_lookup)
+print(tickets_df.head())
+print(tickets_df.head())
+print(tickets_df["plan"].isna().sum(), "tickets without a plan")        # should be zero
+print(tickets_df["plan"].value_counts(normalize=True).round(3))   
+
+# B2. Category weights per plan (%), from my calibration table.
+# Order of each list matches `categories`. Each list adds to 100.
+# Overall mix (weighted by ticket share per plan) lands within 0.5 points of the brief:
+#   invoicing 22.3 | client_payments 18.0 | billing 13.8 | integrations 12.7
+#   account_access 12.1 | bugs 9.0 | tax 7.0 | feature_requests 5.0
+# Reasoning:
+#   - Invoicing high for Free (newer users, 5-invoice limit), low for Business
+#   - Client payments rises with plan (more money moving -> more declines/disputes)
+#   - Billing highest for Free/Starter (upgrade and price questions)
+#   - Integrations low for Free (no sync, only "how do I set it up" questions),
+#     highest for Pro (first plan with QuickBooks/Xero sync)
+#   - Account access highest for Business (up to 10 users, permissions)
+#   - Bugs, tax, feature requests the same for every plan
+categories = [
+    "invoicing",
+    "client_payments",
+    "billing",
+    "integrations",
+    "account_access",
+    "bugs",
+    "tax",
+    "feature_requests",
+]
+
+category_weights = {
+    #            inv  pay  bill integ acct bugs tax  feat
+    "free":     [28,  15,  16,   8,   12,   9,   7,   5],
+    "starter":  [22,  18,  15,  13,   11,   9,   7,   5],
+    "pro":      [14,  22,   9,  22,   12,   9,   7,   5],
+    "business": [10,  26,   8,  17,   18,   9,   7,   5],
+}
+
+# Safety check: each plan's weights must add to 100
+for plan_name, weights in category_weights.items():
+    print(plan_name, sum(weights))
+
+# B3. Pick a category for each ticket, using its plan's weights
+ticket_plan = tickets_df["plan"].to_numpy()
+category = np.empty(n_tickets, dtype=object)   # one empty slot per ticket
+
+for plan_name, weights in category_weights.items():
+    is_this_plan = ticket_plan == plan_name                 # True for this plan's tickets (a "mask")
+    p = np.array(weights) / 100                             # % -> probabilities that add to 1
+    category[is_this_plan] = rng.choice(categories, size=is_this_plan.sum(), p=p)
+
+tickets_df["category"] = category
+
+# B4. Checks
+print("\nB4 Check")
+print(tickets_df["category"].isna().sum(), "tickets without a category")    # should be 0
+
+# Overall mix: compare with the brief (22/18/14/13/12/9/7/5)
+print(tickets_df["category"].value_counts(normalize=True).round(3))
+
+# Mix within each plan: should look like the weights table
+# crosstab counts every combination of two columns (like a pivot table);
+# normalize="columns" turns each plan's column into shares
+by_plan = pd.crosstab(tickets_df["category"], tickets_df["plan"], normalize="columns") * 100
+print(by_plan.round(1)[["free", "starter", "pro", "business"]])
